@@ -18,7 +18,7 @@ import { useStore } from './store';
 const CameraController = () => {
   const { camera, size } = useThree();
   const { laneCount } = useStore();
-  
+
   useFrame((state, delta) => {
     // Determine if screen is narrow (mobile portrait)
     const aspect = size.width / size.height;
@@ -28,41 +28,45 @@ const CameraController = () => {
     // Mobile requires backing up significantly more because vertical FOV is fixed in Three.js,
     // meaning horizontal view shrinks as aspect ratio drops.
     // We use more aggressive multipliers for mobile to keep outer lanes in frame.
-    const heightFactor = isMobile ? 2.0 : 0.5;
-    const distFactor = isMobile ? 4.5 : 1.0;
+    // IMPROVED: Lower angle for mobile to see further ahead
+    const heightFactor = isMobile ? 1.5 : 0.5;
+    const distFactor = isMobile ? 6.0 : 1.0;
 
     // Base (3 lanes): y=5.5, z=8
     // Calculate target based on how many extra lanes we have relative to the start
     const extraLanes = Math.max(0, laneCount - 3);
 
-    const targetY = 5.5 + (extraLanes * heightFactor);
+    // Mobile: Lower height relative to distance to see more forward
+    const baseHeight = isMobile ? 4.0 : 5.5;
+
+    const targetY = baseHeight + (extraLanes * heightFactor);
     const targetZ = 8.0 + (extraLanes * distFactor);
 
     const targetPos = new THREE.Vector3(0, targetY, targetZ);
-    
+
     // Smoothly interpolate camera position
     camera.position.lerp(targetPos, delta * 2.0);
-    
+
     // Look further down the track to see the end of lanes
     // Adjust look target slightly based on height to maintain angle
-    camera.lookAt(0, 0, -30); 
+    camera.lookAt(0, 0, -30);
   });
-  
+
   return null;
 };
 
 function Scene() {
   return (
     <>
-        <Environment />
-        <group>
-            {/* Attach a userData to identify player group for LevelManager collision logic */}
-            <group userData={{ isPlayer: true }} name="PlayerGroup">
-                 <Player />
-            </group>
-            <LevelManager />
+      <Environment />
+      <group>
+        {/* Attach a userData to identify player group for LevelManager collision logic */}
+        <group userData={{ isPlayer: true }} name="PlayerGroup">
+          <Player />
         </group>
-        <Effects />
+        <LevelManager />
+      </group>
+      <Effects />
     </>
   );
 }
@@ -73,14 +77,14 @@ function App() {
       <HUD />
       <Canvas
         shadows
-        dpr={[1, 1.5]} 
+        dpr={[1, 1.5]}
         gl={{ antialias: false, stencil: false, depth: true, powerPreference: "high-performance" }}
         // Initial camera, matches the controller base
         camera={{ position: [0, 5.5, 8], fov: 60 }}
       >
         <CameraController />
         <Suspense fallback={null}>
-            <Scene />
+          <Scene />
         </Suspense>
       </Canvas>
     </div>

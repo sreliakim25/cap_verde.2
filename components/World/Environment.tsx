@@ -5,7 +5,7 @@
 
 
 import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore } from '../../store';
 import { LANE_WIDTH } from '../../types';
@@ -131,55 +131,27 @@ const LaneGuides: React.FC = () => {
 const UrbanSkyline: React.FC = () => {
     // Replace RetroSun with simplified city skyline backdrop
     const groupRef = useRef<THREE.Group>(null);
+    const texture = useLoader(THREE.TextureLoader, './city_background.png');
 
     useFrame((state) => {
-        // Gentle sway for clouds
+        // Gentle sway for clouds or parallax effect could be added here
         if (groupRef.current) {
-            groupRef.current.position.x = Math.sin(state.clock.elapsedTime * 0.1) * 3;
+            // Parallax effect based on camera movement or time
+            groupRef.current.position.x = Math.sin(state.clock.elapsedTime * 0.05) * 5;
         }
     });
 
     return (
-        <group ref={groupRef} position={[0, 25, -200]}>
-            {/* Sky gradient plane */}
-            <mesh position={[0, 20, 0]}>
-                <planeGeometry args={[500, 100]} />
+        <group ref={groupRef} position={[0, 40, -250]}>
+            {/* Background Image Plane */}
+            <mesh position={[0, 0, 0]}>
+                <planeGeometry args={[600, 150]} />
                 <meshBasicMaterial
-                    color="#87CEEB" // Sky blue
+                    map={texture}
                     transparent
-                    opacity={0.9}
+                    opacity={1}
                 />
             </mesh>
-
-            {/* Simplified building silhouettes */}
-            {[-60, -30, 0, 30, 60].map((xPos, idx) => (
-                <mesh
-                    key={`building-${idx}`}
-                    position={[xPos + (idx % 2) * 10, Math.random() * 15, 0]}
-                >
-                    <boxGeometry args={[15, 20 + Math.random() * 30, 5]} />
-                    <meshBasicMaterial
-                        color="#94a3b8" // Building gray
-                        transparent
-                        opacity={0.5}
-                    />
-                </mesh>
-            ))}
-
-            {/* Green tree shapes on buildings */}
-            {[-40, -10, 20, 50].map((xPos, idx) => (
-                <mesh
-                    key={`tree-${idx}`}
-                    position={[xPos, 5 + Math.random() * 10, 5]}
-                >
-                    <sphereGeometry args={[3 + Math.random() * 2, 8, 8]} />
-                    <meshBasicMaterial
-                        color="#22c55e" // Tree green
-                        transparent
-                        opacity={0.6}
-                    />
-                </mesh>
-            ))}
         </group>
     );
 };

@@ -42,7 +42,7 @@ interface GameState {
   activateImmortality: () => void;
 }
 
-const GEMINI_TARGET = ['C', 'A', 'P', 'I', 'T', 'Ã', 'O', ' ', 'V', 'E', 'R', 'D', 'E'];
+const GEMINI_TARGET = ['V', 'E', 'R', 'D', 'E'];
 const MAX_LEVEL = 3;
 
 export const useStore = create<GameState>((set, get) => ({

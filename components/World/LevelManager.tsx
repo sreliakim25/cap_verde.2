@@ -5,7 +5,7 @@
 
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Text3D, Center, Float } from '@react-three/drei';
 import { v4 as uuidv4 } from 'uuid';
@@ -452,7 +452,7 @@ export const LevelManager: React.FC = () => {
 
             if (isLetterDue) {
                 const lane = getRandomLane(laneCount);
-                const target = ['C', 'A', 'P', 'I', 'T', 'Ã', 'O', ' ', 'V', 'E', 'R', 'D', 'E'];
+                const target = ['V', 'E', 'R', 'D', 'E'];
 
                 // Filter out indices that are spaces or already collected
                 const availableIndices = target
@@ -487,6 +487,9 @@ export const LevelManager: React.FC = () => {
                         color: '#00ffff',
                         points: 50
                     });
+
+                    // CRITICAL FIX: Increment distance even for fallback gems to prevent "infinite gem loop" blocking obstacles
+                    nextLetterDistance.current += getLetterInterval(level);
                     hasChanges = true;
                 }
 
@@ -611,6 +614,31 @@ export const LevelManager: React.FC = () => {
     );
 };
 
+const BuildingMesh: React.FC<{ scale: number[] }> = ({ scale }) => {
+    const texture = useLoader(THREE.TextureLoader, './building_facade.png');
+
+    // Clone texture to allow independent UV scaling per building instance if necessary,
+    // but for performance, we can try using the same texture with adjusted UVs in the geometry
+    // or just rely on world-space triplanar mapping? No, standard mapping is fine for box.
+    // We need to update repeat based on scale.
+
+    const configuredTexture = useMemo(() => {
+        const t = texture.clone();
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        // Repeat texture: 1 repeat per 5 units of height/width roughly
+        t.repeat.set(scale[0] / 5, scale[1] / 5);
+        t.needsUpdate = true;
+        return t;
+    }, [texture, scale]);
+
+    return (
+        <mesh geometry={BUILDING_GEO} scale={scale} position={[0, scale[1] / 2, 0]}>
+            {/* Use basic material for brightness or standard for lighting */}
+            <meshStandardMaterial map={configuredTexture} color="#ffffff" roughness={0.3} metalness={0.1} />
+        </mesh>
+    );
+};
+
 const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
     const groupRef = useRef<THREE.Group>(null);
     const visualRef = useRef<THREE.Group>(null);
@@ -676,16 +704,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
                 {/* --- BUILDING (Eco-City) --- */}
                 {data.type === ObjectType.BUILDING && data.scale && (
                     <group>
-                        {/* Main Building Block */}
-                        <mesh geometry={BUILDING_GEO} scale={data.scale} position={[0, data.scale[1] / 2, 0]}>
-                            <meshStandardMaterial color="#2e7d32" roughness={0.6} metalness={0.1} />
-                        </mesh>
-
-                        {/* Vertical Greenery / Panels (Decorative stripes) */}
-                        <mesh position={[0, data.scale[1] / 2, data.scale[2] / 2 + 0.1]} scale={[data.scale[0] * 0.8, data.scale[1] * 0.9, 0.1]}>
-                            <boxGeometry />
-                            <meshStandardMaterial color="#4ade80" roughness={0.8} />
-                        </mesh>
+                        <BuildingMesh scale={data.scale} />
 
                         {/* Solar Panel on Roof */}
                         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, data.scale[1] + 0.1, 0]} geometry={SOLAR_PANEL_GEO} scale={[data.scale[0] * 0.8, data.scale[2] * 0.8, 1]}>

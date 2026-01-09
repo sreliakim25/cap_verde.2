@@ -4,11 +4,12 @@
 */
 
 
-import React, { useState, useEffect } from 'react';
-import { Heart, Zap, Trophy, MapPin, Diamond, Rocket, ArrowUpCircle, Shield, Activity, PlusCircle, Play } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Heart, Zap, Trophy, MapPin, Diamond, Rocket, ArrowUpCircle, Shield, Activity, PlusCircle, Play, Leaf, RefreshCw } from 'lucide-react';
 import { useStore } from '../../store';
 import { GameStatus, GEMINI_COLORS, ShopItem, RUN_SPEED_BASE } from '../../types';
 import { audio } from '../System/Audio';
+import { Leaderboard } from './Leaderboard';
 
 // Available Shop Items
 const SHOP_ITEMS: ShopItem[] = [
@@ -150,17 +151,94 @@ const GameOverScreen: React.FC = () => {
                     TENTAR NOVAMENTE
                 </button>
 
-                <p className="text-green-300/80 text-sm md:text-lg font-mono text-center max-w-lg px-4 animate-pulse">
+                <p className="text-green-300/80 text-sm md:text-lg font-mono text-center max-w-lg px-4 animate-pulse mb-6">
                     "{message}"
                 </p>
+
+                {/* Leaderboard Section */}
+                <div className="w-full max-w-md">
+                    <Leaderboard currentScore={score} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const VictoryScreen: React.FC = () => {
+    const { score, level, gemsCollected, distance, restartGame } = useStore();
+
+    const quotes = [
+        "A sustentabilidade é o caminho para o nosso futuro.",
+        "Pequenas ações, grande impacto. Mantenha o verde!",
+        "A Terra agradece pelo seu serviço, Capitão!",
+        "A natureza não é um lugar para visitar. É o nosso lar."
+    ];
+
+    // Use useMemo here correctly at the top level of the component
+    const randomQuote = useMemo(() => quotes[Math.floor(Math.random() * quotes.length)], []);
+
+    return (
+        <div className="absolute inset-0 z-[100] bg-slate-900 bg-cover bg-center flex flex-col items-center justify-end pb-16 p-4 pointer-events-auto" style={{ backgroundImage: 'url(/victory_background.png)' }}>
+            {/* Dark overlay for contrast */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+
+            <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-4xl px-4 mb-8">
+                <Leaf className="w-16 h-16 md:w-20 md:h-20 text-green-400 mb-2 animate-bounce drop-shadow-[0_0_15px_rgba(74,222,128,0.6)]" />
+
+                <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 mb-2 drop-shadow-[0_0_20px_rgba(34,197,94,0.6)] font-cyber text-center leading-tight">
+                    MISSÃO CUMPRIDA
+                </h1>
+
+                <p className="text-green-200 text-sm md:text-xl font-mono mb-8 tracking-widest text-center italic max-w-2xl bg-black/40 p-2 rounded">
+                    "{randomQuote}"
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
+                    <div className="flex flex-col items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center mb-8 w-full max-w-2xl">
+                            <div className="bg-black/60 p-6 rounded-xl border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)] backdrop-blur-sm md:col-span-3">
+                                <div className="text-xs md:text-sm text-green-400/70 mb-1 tracking-wider uppercase">Pontuação Final</div>
+                                <div className="text-4xl md:text-6xl font-bold font-cyber text-white drop-shadow-md">{score.toLocaleString()}</div>
+                            </div>
+
+                            <div className="bg-black/60 p-4 rounded-lg border border-white/10 backdrop-blur-sm">
+                                <div className="text-xs text-green-400/70 uppercase">Gems</div>
+                                <div className="text-xl md:text-3xl font-bold text-cyan-400">{gemsCollected}</div>
+                            </div>
+                            <div className="bg-black/60 p-4 rounded-lg border border-white/10 backdrop-blur-sm">
+                                <div className="text-xs text-green-400/70 uppercase">Distância</div>
+                                <div className="text-xl md:text-3xl font-bold text-purple-400">{Math.floor(distance)} M</div>
+                            </div>
+                            <div className="bg-black/60 p-4 rounded-lg border border-white/10 backdrop-blur-sm">
+                                <div className="text-xs text-green-400/70 uppercase">Nível</div>
+                                <div className="text-xl md:text-3xl font-bold text-yellow-400">{level}</div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => { audio.init(); restartGame(); }}
+                            className="group relative px-8 md:px-12 py-4 md:py-5 bg-green-600 hover:bg-green-500 text-white font-black text-lg md:text-xl rounded-xl hover:scale-105 transition-all shadow-[0_0_30px_rgba(34,197,94,0.4)] tracking-widest overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                            <span className="relative z-10 flex items-center">
+                                REINICIAR MISSÃO <RefreshCw className="ml-2 w-5 h-5" />
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Leaderboard Column */}
+                    <div className="flex flex-col items-center justify-start w-full">
+                        <Leaderboard currentScore={score} />
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
 
 export const HUD: React.FC = () => {
-    const { score, lives, maxLives, collectedLetters, status, level, restartGame, startGame, gemsCollected, distance, isImmortalityActive, speed } = useStore();
-    const target = ['C', 'A', 'P', ' ', 'V', 'E', 'R', 'D', 'E'];
+    const { score, lives, maxLives, collectedLetters, status, level, restartGame, startGame, gemsCollected, distance, isImmortalityActive, speed, setStatus } = useStore();
+    const target = ['V', 'E', 'R', 'D', 'E'];
 
     // Common container style
     const containerClass = "absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8 z-50";
@@ -171,38 +249,37 @@ export const HUD: React.FC = () => {
 
     if (status === GameStatus.MENU) {
         return (
-            <div className="absolute inset-0 flex items-center justify-center z-[100] bg-black/80 backdrop-blur-sm p-4 pointer-events-auto">
-                {/* Card Container */}
-                <div className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,255,255,0.2)] border border-white/10 animate-in zoom-in-95 duration-500">
+            <div className="absolute inset-0 z-[100] bg-black bg-contain bg-center bg-no-repeat flex flex-col items-center justify-end pb-16 p-4 pointer-events-auto" style={{ backgroundImage: 'url(/menu_background_clean.png)' }}>
+                {/* Dark overlay for contrast - lighter at top to show captain */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-                    {/* Image Container - Auto height to fit full image without cropping */}
-                    <div className="relative w-full bg-gray-900">
-                        <img
-                            src="/assets/capitao-verde-menu.jpg"
-                            alt="Capitão Verde Run Cover"
-                            className="w-full h-auto block"
-                        />
+                {/* Card Container - Simplified and moved down */}
+                <div className="relative w-full max-w-sm bg-black/60 backdrop-blur-md rounded-2xl border border-green-500/30 p-6 shadow-[0_0_50px_rgba(0,255,100,0.3)] animate-in slide-in-from-bottom-10 duration-700 flex flex-col items-center mb-8">
 
-                        {/* Gradient Overlay for text readability */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#050011] via-black/30 to-transparent"></div>
+                    <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mb-8 font-cyber text-center leading-tight drop-shadow-sm">
+                        CAPITÃO VERDE<br /><span className="text-white text-2xl md:text-3xl tracking-[0.2em]">RUN</span>
+                    </h1>
 
-                        {/* Content positioned at the bottom of the card */}
-                        <div className="absolute inset-0 flex flex-col justify-end items-center p-6 pb-8 text-center z-10">
-                            <button
-                                onClick={() => { audio.init(); startGame(); }}
-                                className="w-full group relative px-6 py-4 bg-green-600/20 backdrop-blur-md border-2 border-green-500 text-white font-black text-xl rounded-xl hover:bg-green-600/40 transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-green-500/40 via-emerald-500/40 to-lime-500/40 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                                <span className="relative z-10 tracking-widest flex items-center justify-center">
-                                    INICIAR MISSÃO <Play className="ml-2 w-5 h-5 fill-white" />
-                                </span>
-                            </button>
+                    <button
+                        onClick={() => { audio.init(); startGame(); }}
+                        className="w-full group relative px-6 py-4 bg-green-600 hover:bg-green-500 text-white font-black text-xl rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.8)] hover:scale-105 active:scale-95"
+                    >
+                        <span className="relative z-10 tracking-widest flex items-center justify-center">
+                            INICIAR MISSÃO <Play className="ml-2 w-5 h-5 fill-white" />
+                        </span>
+                    </button>
 
-                            <p className="text-green-400/70 text-[10px] md:text-xs font-mono mt-3 tracking-wider">
-                                [ SETAS / SWIPE PARA MOVER ]
-                            </p>
-                        </div>
-                    </div>
+                    <p className="text-green-400/70 text-[10px] md:text-xs font-mono mt-6 tracking-wider text-center">
+                        [ SETAS / SWIPE PARA MOVER ]
+                    </p>
+
+                    {/* DEBUG BUTTON - MENU */}
+                    <button
+                        onClick={() => setStatus(GameStatus.VICTORY)}
+                        className="absolute bottom-4 left-4 bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white text-xs px-2 py-1 rounded border border-red-500/30 backdrop-blur-sm transition-all shadow-sm font-mono pointer-events-auto"
+                    >
+                        ★ WIN (TEST)
+                    </button>
                 </div>
             </div>
         );
@@ -213,43 +290,7 @@ export const HUD: React.FC = () => {
     }
 
     if (status === GameStatus.VICTORY) {
-        return (
-            <div className="absolute inset-0 bg-gradient-to-b from-purple-900/90 to-black/95 z-[100] text-white pointer-events-auto backdrop-blur-md overflow-y-auto">
-                <div className="flex flex-col items-center justify-center min-h-full py-8 px-4">
-                    <Rocket className="w-16 h-16 md:w-24 md:h-24 text-yellow-400 mb-4 animate-bounce drop-shadow-[0_0_15px_rgba(255,215,0,0.6)]" />
-                    <h1 className="text-3xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-500 to-pink-500 mb-2 drop-shadow-[0_0_20px_rgba(255,165,0,0.6)] font-cyber text-center leading-tight">
-                        MISSION COMPLETE
-                    </h1>
-                    <p className="text-cyan-300 text-sm md:text-2xl font-mono mb-8 tracking-widest text-center">
-                        THE ANSWER TO THE UNIVERSE HAS BEEN FOUND
-                    </p>
-
-                    <div className="grid grid-cols-1 gap-4 text-center mb-8 w-full max-w-md">
-                        <div className="bg-black/60 p-6 rounded-xl border border-yellow-500/30 shadow-[0_0_15px_rgba(255,215,0,0.1)]">
-                            <div className="text-xs md:text-sm text-gray-400 mb-1 tracking-wider">FINAL SCORE</div>
-                            <div className="text-3xl md:text-4xl font-bold font-cyber text-yellow-400">{score.toLocaleString()}</div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-black/60 p-4 rounded-lg border border-white/10">
-                                <div className="text-xs text-gray-400">GEMS</div>
-                                <div className="text-xl md:text-2xl font-bold text-cyan-400">{gemsCollected}</div>
-                            </div>
-                            <div className="bg-black/60 p-4 rounded-lg border border-white/10">
-                                <div className="text-xs text-gray-400">DISTÂNCIA</div>
-                                <div className="text-xl md:text-2xl font-bold text-purple-400">{Math.floor(distance)} M</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => { audio.init(); restartGame(); }}
-                        className="px-8 md:px-12 py-4 md:py-5 bg-white text-black font-black text-lg md:text-xl rounded hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,255,255,0.3)] tracking-widest"
-                    >
-                        RESTART MISSION
-                    </button>
-                </div>
-            </div>
-        );
+        return <VictoryScreen />;
     }
 
     return (
@@ -315,6 +356,16 @@ export const HUD: React.FC = () => {
                 <div className="flex items-center space-x-2 text-cyan-500 opacity-70">
                     <Zap className="w-4 h-4 md:w-6 md:h-6 animate-pulse" />
                     <span className="font-mono text-base md:text-xl">SPEED {Math.round((speed / RUN_SPEED_BASE) * 100)}%</span>
+                </div>
+
+                {/* DEBUG BUTTON - GAMEPLAY */}
+                <div className="absolute bottom-4 left-4 z-[200] pointer-events-auto">
+                    <button
+                        onClick={() => setStatus(GameStatus.VICTORY)}
+                        className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white text-xs px-3 py-1 rounded border border-red-500/30 backdrop-blur-sm transition-all shadow-sm font-mono"
+                    >
+                        ★ WIN (TEST)
+                    </button>
                 </div>
             </div>
         </div>
