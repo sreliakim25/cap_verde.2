@@ -43,6 +43,11 @@ const SHOP_BACK_GEO = new THREE.BoxGeometry(1, 5, 1.2); // Will be scaled
 const SHOP_OUTLINE_GEO = new THREE.BoxGeometry(1, 7.2, 0.8); // Will be scaled
 const SHOP_FLOOR_GEO = new THREE.PlaneGeometry(1, 4); // Will be scaled
 
+// Building Geometries
+const BUILDING_GEO = new THREE.BoxGeometry(1, 1, 1); // Will be scaled
+const SOLAR_PANEL_GEO = new THREE.PlaneGeometry(0.8, 0.8);
+const WINDOW_GEO = new THREE.PlaneGeometry(0.2, 0.3);
+
 const PARTICLE_COUNT = 600;
 const BASE_LETTER_INTERVAL = 150;
 
@@ -179,6 +184,9 @@ export const LevelManager: React.FC = () => {
     const distanceTraveled = useRef(0);
     const nextLetterDistance = useRef(BASE_LETTER_INTERVAL);
 
+    // Track building spawn
+    const distanceSinceLastBuilding = useRef(0);
+
     // Handle resets and transitions
     useEffect(() => {
         const isRestart = status === GameStatus.PLAYING && prevStatus.current === GameStatus.GAME_OVER;
@@ -194,13 +202,14 @@ export const LevelManager: React.FC = () => {
             // Reset trackers
             distanceTraveled.current = 0;
             nextLetterDistance.current = getLetterInterval(1);
+            distanceSinceLastBuilding.current = 0;
 
         } else if (isLevelUp && level > 1) {
             // Soft Reset for Level Up (Keep visible objects)
             // Clear objects deep in the fog (> -80) to make room for portal, but keep visible ones
             objectsRef.current = objectsRef.current.filter(obj => obj.position[2] > -80);
 
-            // Spawn Shop Portal further out (Twice previous distance)
+            // Spawn Shop Portal further out
             objectsRef.current.push({
                 id: uuidv4(),
                 type: ObjectType.SHOP_PORTAL,
@@ -208,9 +217,6 @@ export const LevelManager: React.FC = () => {
                 active: true,
             });
 
-            // Adjust next letter spawn for the new level's difficulty (50% increase).
-            // We calculate this relative to where the last letter was (which was approx at player position + 0, so SPAWN_DISTANCE ago).
-            // This ensures the gap between the last letter of Level X and the first letter of Level X+1 is the new interval.
             nextLetterDistance.current = distanceTraveled.current - SPAWN_DISTANCE + getLetterInterval(level);
 
             setRenderTrigger(t => t + 1);
@@ -239,6 +245,7 @@ export const LevelManager: React.FC = () => {
         const dist = speed * safeDelta;
 
         distanceTraveled.current += dist;
+        distanceSinceLastBuilding.current += dist;
 
         let hasChanges = false;
         let playerPos = new THREE.Vector3(0, 0, 0);
@@ -308,8 +315,9 @@ export const LevelManager: React.FC = () => {
                 } else if (inZZone) {
                     // STANDARD COLLISION
                     const dx = Math.abs(obj.position[0] - playerPos.x);
-                    if (dx < 0.9) { // Slightly increased horizontal forgiveness
 
+                    // Buildings don't collide with player (they are outside lanes)
+                    if (obj.type !== ObjectType.BUILDING && dx < 0.9) {
                         // Obstacles, Aliens, and Missiles damage player
                         const isDamageSource = obj.type === ObjectType.OBSTACLE || obj.type === ObjectType.ALIEN || obj.type === ObjectType.MISSILE;
 
@@ -391,13 +399,49 @@ export const LevelManager: React.FC = () => {
         // 2. Spawning Logic
         let furthestZ = 0;
         // Only consider static obstacles/gems for gap calculation, not missiles or moving aliens
-        const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE);
+        const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE && o.type !== ObjectType.BUILDING);
 
         if (staticObjects.length > 0) {
             furthestZ = Math.min(...staticObjects.map(o => o.position[2]));
         } else {
             furthestZ = -20;
         }
+
+        // --- BUILDING SPAWN LOGIC ---
+        // Spawn buildings every 20-30 units
+        if (distanceSinceLastBuilding.current > 25) {
+            const buildingSpawnZ = -SPAWN_DISTANCE - 10;
+            const buildingWidth = 5; // Base width assumption
+            const laneTotalWidth = laneCount * LANE_WIDTH;
+
+            // Calculate offset to place buildings outside of the playing lanes
+            // Extra padding to ensure they are visually distinct from the road
+            const offset = (laneTotalWidth / 2) + (buildingWidth / 2) + 2.0;
+
+            // Spawn Left Building
+            keptObjects.push({
+                id: uuidv4(),
+                type: ObjectType.BUILDING,
+                position: [-offset, 0, buildingSpawnZ],
+                active: true,
+                scale: [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2],
+                // No rotation needed for basic blocks, but could add slight rotation
+            });
+
+            // Spawn Right Building
+            keptObjects.push({
+                id: uuidv4(),
+                type: ObjectType.BUILDING,
+                position: [offset, 0, buildingSpawnZ],
+                active: true,
+                scale: [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2],
+                rotation: [0, Math.PI, 0] // Flip if using directional models, irrelevant for box
+            });
+
+            distanceSinceLastBuilding.current = 0;
+            hasChanges = true;
+        }
+
 
         if (furthestZ > -SPAWN_DISTANCE) {
             // Reduced gap formula to increase obstacle frequency
@@ -593,7 +637,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
                 // Alien Hover
                 visualRef.current.position.y = baseHeight + Math.sin(state.clock.elapsedTime * 3) * 0.2;
                 visualRef.current.rotation.y += delta;
-            } else if (data.type !== ObjectType.OBSTACLE) {
+            } else if (data.type !== ObjectType.OBSTACLE && data.type !== ObjectType.BUILDING) {
                 // Gem/Letter Bobbing
                 visualRef.current.rotation.y += delta * 3;
                 const bobOffset = Math.sin(state.clock.elapsedTime * 4 + data.position[0]) * 0.1;
@@ -616,6 +660,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
         if (data.type === ObjectType.SHOP_PORTAL) return null; // No shadow needed or custom handled
         if (data.type === ObjectType.ALIEN) return SHADOW_ALIEN_GEO;
         if (data.type === ObjectType.MISSILE) return SHADOW_MISSILE_GEO;
+        if (data.type === ObjectType.BUILDING) return null;
         return SHADOW_DEFAULT_GEO;
     }, [data.type]);
 
@@ -628,6 +673,27 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
             )}
 
             <group ref={visualRef} position={[0, data.position[1], 0]}>
+                {/* --- BUILDING (Eco-City) --- */}
+                {data.type === ObjectType.BUILDING && data.scale && (
+                    <group>
+                        {/* Main Building Block */}
+                        <mesh geometry={BUILDING_GEO} scale={data.scale} position={[0, data.scale[1] / 2, 0]}>
+                            <meshStandardMaterial color="#2e7d32" roughness={0.6} metalness={0.1} />
+                        </mesh>
+
+                        {/* Vertical Greenery / Panels (Decorative stripes) */}
+                        <mesh position={[0, data.scale[1] / 2, data.scale[2] / 2 + 0.1]} scale={[data.scale[0] * 0.8, data.scale[1] * 0.9, 0.1]}>
+                            <boxGeometry />
+                            <meshStandardMaterial color="#4ade80" roughness={0.8} />
+                        </mesh>
+
+                        {/* Solar Panel on Roof */}
+                        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, data.scale[1] + 0.1, 0]} geometry={SOLAR_PANEL_GEO} scale={[data.scale[0] * 0.8, data.scale[2] * 0.8, 1]}>
+                            <meshStandardMaterial color="#1e3a8a" roughness={0.2} metalness={0.8} />
+                        </mesh>
+                    </group>
+                )}
+
                 {/* --- SHOP PORTAL --- */}
                 {data.type === ObjectType.SHOP_PORTAL && (
                     <group>
@@ -642,7 +708,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
                         </mesh>
                         <Center position={[0, 5, 0.6]}>
                             <Text3D font={FONT_URL} size={1.2} height={0.2}>
-                                CYBER SHOP
+                                LOJA SUSTENTÁVEL
                                 <meshBasicMaterial color="#ffff00" />
                             </Text3D>
                         </Center>

@@ -18,7 +18,8 @@ export enum ObjectType {
   LETTER = 'LETTER',
   SHOP_PORTAL = 'SHOP_PORTAL',
   ALIEN = 'ALIEN',
-  MISSILE = 'MISSILE'
+  MISSILE = 'MISSILE',
+  BUILDING = 'BUILDING'
 }
 
 export interface GameObject {
@@ -31,6 +32,8 @@ export interface GameObject {
   targetIndex?: number; // Index in the GEMINI target word
   points?: number; // Score value for gems
   hasFired?: boolean; // For Aliens
+  rotation?: [number, number, number]; // Custom rotation
+  scale?: [number, number, number]; // Custom scale
 }
 
 export const LANE_WIDTH = 2.2;
