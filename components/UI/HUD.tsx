@@ -273,13 +273,7 @@ export const HUD: React.FC = () => {
                         [ SETAS / SWIPE PARA MOVER ]
                     </p>
 
-                    {/* DEBUG BUTTON - MENU */}
-                    <button
-                        onClick={() => setStatus(GameStatus.VICTORY)}
-                        className="absolute bottom-4 left-4 bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white text-xs px-2 py-1 rounded border border-red-500/30 backdrop-blur-sm transition-all shadow-sm font-mono pointer-events-auto"
-                    >
-                        ★ WIN (TEST)
-                    </button>
+
                 </div>
             </div>
         );
@@ -358,15 +352,7 @@ export const HUD: React.FC = () => {
                     <span className="font-mono text-base md:text-xl">SPEED {Math.round((speed / RUN_SPEED_BASE) * 100)}%</span>
                 </div>
 
-                {/* DEBUG BUTTON - GAMEPLAY */}
-                <div className="absolute bottom-4 left-4 z-[200] pointer-events-auto">
-                    <button
-                        onClick={() => setStatus(GameStatus.VICTORY)}
-                        className="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white text-xs px-3 py-1 rounded border border-red-500/30 backdrop-blur-sm transition-all shadow-sm font-mono"
-                    >
-                        ★ WIN (TEST)
-                    </button>
-                </div>
+
             </div>
         </div>
     );
