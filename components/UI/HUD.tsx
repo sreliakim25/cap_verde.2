@@ -157,7 +157,7 @@ const GameOverScreen: React.FC = () => {
 
                 {/* Leaderboard Section */}
                 <div className="w-full max-w-md">
-                    <Leaderboard currentScore={score} />
+                    <Leaderboard currentScore={score} allowSubmission={false} />
                 </div>
             </div>
         </div>
@@ -228,7 +228,7 @@ const VictoryScreen: React.FC = () => {
 
                     {/* Leaderboard Column */}
                     <div className="flex flex-col items-center justify-start w-full">
-                        <Leaderboard currentScore={score} />
+                        <Leaderboard currentScore={score} allowSubmission={true} />
                     </div>
                 </div>
             </div>
@@ -249,9 +249,9 @@ export const HUD: React.FC = () => {
 
     if (status === GameStatus.MENU) {
         return (
-            <div className="absolute inset-0 z-[100] bg-black bg-contain bg-center bg-no-repeat flex flex-col items-center justify-end pb-16 p-4 pointer-events-auto" style={{ backgroundImage: 'url(/menu_background_clean.png)' }}>
+            <div className="absolute inset-0 z-[100] bg-black bg-cover bg-center bg-no-repeat flex flex-col items-center justify-end pb-8 md:pb-16 p-4 pointer-events-auto overflow-hidden" style={{ backgroundImage: 'url(/menu_background_clean.png)' }}>
                 {/* Dark overlay for contrast - lighter at top to show captain */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
 
                 {/* Card Container - Simplified and moved down */}
                 <div className="relative w-full max-w-sm bg-black/60 backdrop-blur-md rounded-2xl border border-green-500/30 p-6 shadow-[0_0_50px_rgba(0,255,100,0.3)] animate-in slide-in-from-bottom-10 duration-700 flex flex-col items-center mb-8">

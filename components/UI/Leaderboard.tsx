@@ -5,9 +5,10 @@ import { Trophy, User, Send, Loader2, AlertCircle } from 'lucide-react';
 interface LeaderboardProps {
     currentScore?: number;
     onClose?: () => void;
+    allowSubmission?: boolean;
 }
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose, allowSubmission = true }) => {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [playerName, setPlayerName] = useState('');
@@ -49,8 +50,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose 
                 <h2 className="text-2xl font-black font-cyber tracking-wider">RANKING GLOBAL</h2>
             </div>
 
-            {/* Score Submission Form - Only if score provided and not submitted yet */}
-            {currentScore !== undefined && currentScore > 0 && !submitted && (
+            {/* Score Submission Form - Only if score provided, allowed, and not submitted yet */}
+            {allowSubmission && currentScore !== undefined && currentScore > 0 && !submitted && (
                 <div className="mb-8 p-4 bg-green-900/20 rounded-lg border border-green-500/20">
                     <h3 className="text-white font-bold mb-2 flex items-center">
                         <span className="text-cyan-400 mr-2">{currentScore.toLocaleString()}</span> PONTOS
@@ -103,8 +104,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose 
                         >
                             <div className="flex items-center space-x-3">
                                 <span className={`font-mono font-bold w-6 text-center ${index === 0 ? 'text-yellow-400 text-xl' :
-                                        index === 1 ? 'text-gray-300 text-lg' :
-                                            index === 2 ? 'text-amber-600 text-lg' : 'text-gray-500'
+                                    index === 1 ? 'text-gray-300 text-lg' :
+                                        index === 2 ? 'text-amber-600 text-lg' : 'text-gray-500'
                                     }`}>
                                     {index + 1}
                                 </span>
