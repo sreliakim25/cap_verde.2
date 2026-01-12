@@ -10,6 +10,7 @@ import { useStore } from '../../store';
 import { GameStatus, GEMINI_COLORS, ShopItem, RUN_SPEED_BASE } from '../../types';
 import { audio } from '../System/Audio';
 import { Leaderboard } from './Leaderboard';
+import { Instructions } from './Instructions';
 
 // Available Shop Items
 const SHOP_ITEMS: ShopItem[] = [
@@ -240,6 +241,8 @@ export const HUD: React.FC = () => {
     const { score, lives, maxLives, collectedLetters, status, level, restartGame, startGame, gemsCollected, distance, isImmortalityActive, speed, setStatus } = useStore();
     const target = ['V', 'E', 'R', 'D', 'E'];
 
+    const [showInstructions, setShowInstructions] = useState(false);
+
     // Common container style
     const containerClass = "absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8 z-50";
 
@@ -262,10 +265,19 @@ export const HUD: React.FC = () => {
 
                     <button
                         onClick={() => { audio.init(); startGame(); }}
-                        className="w-full group relative px-6 py-4 bg-green-600 hover:bg-green-500 text-white font-black text-xl rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.8)] hover:scale-105 active:scale-95"
+                        className="w-full group relative px-6 py-4 bg-green-600 hover:bg-green-500 text-white font-black text-xl rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.8)] hover:scale-105 active:scale-95 mb-4"
                     >
                         <span className="relative z-10 tracking-widest flex items-center justify-center">
                             INICIAR MISSÃO <Play className="ml-2 w-5 h-5 fill-white" />
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowInstructions(true)}
+                        className="w-full group relative px-6 py-3 bg-gray-800 hover:bg-gray-700 text-green-400 font-bold text-lg rounded-xl transition-all hover:scale-105 active:scale-95 border border-green-500/30"
+                    >
+                        <span className="relative z-10 tracking-wider flex items-center justify-center">
+                            INSTRUÇÕES / MISSÃO <Shield className="ml-2 w-5 h-5" />
                         </span>
                     </button>
 
@@ -273,8 +285,10 @@ export const HUD: React.FC = () => {
                         [ SETAS / SWIPE PARA MOVER ]
                     </p>
 
-
                 </div>
+
+                {/* Instructions Modal */}
+                {showInstructions && <Instructions onClose={() => setShowInstructions(false)} />}
             </div>
         );
     }
