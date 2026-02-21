@@ -20,14 +20,7 @@ export class AudioController {
       const unlockAudio = () => {
         if (!this.ctx) this.init();
         if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume().then(() => {
-            // Force play the current track if it was queued
-            if (this.currentTrack !== undefined && !this.bgmSource) {
-              this.playBGM(this.currentTrack);
-            }
-          }).catch(() => { });
-        } else if (this.ctx && this.ctx.state === 'running' && !this.bgmSource) {
-          this.playBGM(this.currentTrack);
+          this.ctx.resume().catch(() => { });
         }
 
         window.removeEventListener('click', unlockAudio);
@@ -100,9 +93,7 @@ export class AudioController {
     this.bgmSource.connect(this.bgmGain);
     this.bgmGain.connect(this.masterGain);
 
-    if (this.ctx.state === 'running') {
-      this.bgmSource.start(0);
-    }
+    this.bgmSource.start(0);
   }
 
   stopBGM() {
