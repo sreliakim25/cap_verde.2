@@ -12,6 +12,11 @@ export enum GameStatus {
   VICTORY = 'VICTORY'
 }
 
+export enum GameMode {
+  MISSION = 'MISSION',
+  ENDLESS = 'ENDLESS'
+}
+
 export enum ObjectType {
   OBSTACLE = 'OBSTACLE',
   GEM = 'GEM',
@@ -19,7 +24,8 @@ export enum ObjectType {
   SHOP_PORTAL = 'SHOP_PORTAL',
   ALIEN = 'ALIEN',
   MISSILE = 'MISSILE',
-  BUILDING = 'BUILDING'
+  BUILDING = 'BUILDING',
+  HOUSE = 'HOUSE'
 }
 
 export interface GameObject {

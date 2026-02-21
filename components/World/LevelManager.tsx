@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { Text3D, Center, Float } from '@react-three/drei';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../../store';
-import { GameObject, ObjectType, LANE_WIDTH, SPAWN_DISTANCE, REMOVE_DISTANCE, GameStatus, GEMINI_COLORS } from '../../types';
+import { GameObject, ObjectType, LANE_WIDTH, SPAWN_DISTANCE, REMOVE_DISTANCE, GameStatus, GEMINI_COLORS, GameMode, RUN_SPEED_BASE } from '../../types';
 import { audio } from '../System/Audio';
 
 // Geometry Constants
@@ -47,6 +47,12 @@ const SHOP_FLOOR_GEO = new THREE.PlaneGeometry(1, 4); // Will be scaled
 const BUILDING_GEO = new THREE.BoxGeometry(1, 1, 1); // Will be scaled
 const SOLAR_PANEL_GEO = new THREE.PlaneGeometry(0.8, 0.8);
 const WINDOW_GEO = new THREE.PlaneGeometry(0.2, 0.3);
+
+// --- Sustainable House Geometries ---
+const HOUSE_GEO = new THREE.BoxGeometry(1, 1, 1); // Base
+const ROOF_GEO = new THREE.ConeGeometry(0.8, 0.6, 4); // Pyramid-like 4-sided roof
+// Rotate roof geometry to align with box nicely
+ROOF_GEO.rotateY(Math.PI / 4);
 
 const PARTICLE_COUNT = 600;
 const BASE_LETTER_INTERVAL = 150;
@@ -172,7 +178,8 @@ export const LevelManager: React.FC = () => {
         laneCount,
         setDistance,
         openShop,
-        level
+        level,
+        gameMode
     } = useStore();
 
     const objectsRef = useRef<GameObject[]>([]);
@@ -186,6 +193,9 @@ export const LevelManager: React.FC = () => {
 
     // Track building spawn
     const distanceSinceLastBuilding = useRef(0);
+    // Endless mode trackers
+    const lastEndlessSpeedIncrease = useRef(0);
+    const distanceSinceLastShop = useRef(0);
 
     // Handle resets and transitions
     useEffect(() => {
@@ -203,8 +213,10 @@ export const LevelManager: React.FC = () => {
             distanceTraveled.current = 0;
             nextLetterDistance.current = getLetterInterval(1);
             distanceSinceLastBuilding.current = 0;
+            lastEndlessSpeedIncrease.current = 0;
+            distanceSinceLastShop.current = 0;
 
-        } else if (isLevelUp && level > 1) {
+        } else if (isLevelUp && level > 1 && gameMode === GameMode.MISSION) {
             // Soft Reset for Level Up (Keep visible objects)
             // Clear objects deep in the fog (> -80) to make room for portal, but keep visible ones
             objectsRef.current = objectsRef.current.filter(obj => obj.position[2] > -80);
@@ -246,6 +258,24 @@ export const LevelManager: React.FC = () => {
 
         distanceTraveled.current += dist;
         distanceSinceLastBuilding.current += dist;
+        distanceSinceLastShop.current += dist;
+
+        // Endless Mode: Speed increase every 1000m and live distance update
+        if (gameMode === GameMode.ENDLESS) {
+            const currentDist = Math.floor(distanceTraveled.current);
+
+            // Speed increase logic
+            const current1kMark = Math.floor(currentDist / 1000);
+            if (current1kMark > lastEndlessSpeedIncrease.current) {
+                lastEndlessSpeedIncrease.current = current1kMark;
+                useStore.setState((state) => ({ speed: state.speed + (RUN_SPEED_BASE * 0.10) }));
+            }
+
+            // Live distance update (throttled to integer changes for performance)
+            if (currentDist > useStore.getState().distance) {
+                useStore.setState({ distance: currentDist });
+            }
+        }
 
         let hasChanges = false;
         let playerPos = new THREE.Vector3(0, 0, 0);
@@ -316,8 +346,8 @@ export const LevelManager: React.FC = () => {
                     // STANDARD COLLISION
                     const dx = Math.abs(obj.position[0] - playerPos.x);
 
-                    // Buildings don't collide with player (they are outside lanes)
-                    if (obj.type !== ObjectType.BUILDING && dx < 0.9) {
+                    // Buildings and Houses don't collide with player (they are outside lanes)
+                    if (obj.type !== ObjectType.BUILDING && obj.type !== ObjectType.HOUSE && dx < 0.9) {
                         // Obstacles, Aliens, and Missiles damage player
                         const isDamageSource = obj.type === ObjectType.OBSTACLE || obj.type === ObjectType.ALIEN || obj.type === ObjectType.MISSILE;
 
@@ -398,8 +428,8 @@ export const LevelManager: React.FC = () => {
 
         // 2. Spawning Logic
         let furthestZ = 0;
-        // Only consider static obstacles/gems for gap calculation, not missiles or moving aliens
-        const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE && o.type !== ObjectType.BUILDING);
+        // Only consider static obstacles/gems for gap calculation, not missiles, buildings, or houses
+        const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE && o.type !== ObjectType.BUILDING && o.type !== ObjectType.HOUSE);
 
         if (staticObjects.length > 0) {
             furthestZ = Math.min(...staticObjects.map(o => o.position[2]));
@@ -409,33 +439,44 @@ export const LevelManager: React.FC = () => {
 
         // --- BUILDING SPAWN LOGIC ---
         // Spawn buildings every 20-30 units
-        if (distanceSinceLastBuilding.current > 25) {
+        if (distanceSinceLastBuilding.current > 15) { // Spawn them a bit closer
             const buildingSpawnZ = -SPAWN_DISTANCE - 10;
-            const buildingWidth = 5; // Base width assumption
+            const isHouse = Math.random() > 0.5;
+            const objType = isHouse ? ObjectType.HOUSE : ObjectType.BUILDING;
+
+            // Houses are smaller, buildings are larger
+            const objWidth = isHouse ? 3 : 5;
             const laneTotalWidth = laneCount * LANE_WIDTH;
 
             // Calculate offset to place buildings outside of the playing lanes
-            // Extra padding to ensure they are visually distinct from the road
-            const offset = (laneTotalWidth / 2) + (buildingWidth / 2) + 2.0;
+            const offset = (laneTotalWidth / 2) + (objWidth / 2) + 2.0;
 
-            // Spawn Left Building
+            // Choose scale based on type
+            const leftScale = isHouse
+                ? [3 + Math.random(), 2.5 + Math.random(), 3 + Math.random()] as [number, number, number]
+                : [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2] as [number, number, number];
+
+            const rightScale = isHouse
+                ? [3 + Math.random(), 2.5 + Math.random(), 3 + Math.random()] as [number, number, number]
+                : [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2] as [number, number, number];
+
+            // Spawn Left Structure
             keptObjects.push({
                 id: uuidv4(),
-                type: ObjectType.BUILDING,
-                position: [-offset, 0, buildingSpawnZ],
+                type: objType,
+                position: [-offset - (isHouse ? Math.random() * 2 : 0), 0, buildingSpawnZ],
                 active: true,
-                scale: [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2],
-                // No rotation needed for basic blocks, but could add slight rotation
+                scale: leftScale,
             });
 
-            // Spawn Right Building
+            // Spawn Right Structure
             keptObjects.push({
                 id: uuidv4(),
-                type: ObjectType.BUILDING,
-                position: [offset, 0, buildingSpawnZ],
+                type: objType,
+                position: [offset + (isHouse ? Math.random() * 2 : 0), 0, buildingSpawnZ],
                 active: true,
-                scale: [4 + Math.random() * 2, 8 + Math.random() * 10, 4 + Math.random() * 2],
-                rotation: [0, Math.PI, 0] // Flip if using directional models, irrelevant for box
+                scale: rightScale,
+                rotation: [0, Math.PI, 0] // Flip facing inward
             });
 
             distanceSinceLastBuilding.current = 0;
@@ -444,156 +485,175 @@ export const LevelManager: React.FC = () => {
 
 
         if (furthestZ > -SPAWN_DISTANCE) {
-            // Reduced gap formula to increase obstacle frequency
-            const minGap = 12 + (speed * 0.4);
-            const spawnZ = Math.min(furthestZ - minGap, -SPAWN_DISTANCE);
+            // Enhanced Endless System: Spawn Shop every 2500m
+            if (gameMode === GameMode.ENDLESS && distanceSinceLastShop.current >= 2500) {
+                // Clear some space for the shop
+                objectsRef.current = objectsRef.current.filter(obj => obj.position[2] > -80);
 
-            const isLetterDue = distanceTraveled.current >= nextLetterDistance.current;
+                // Spawn Shop Portal
+                keptObjects.push({
+                    id: uuidv4(),
+                    type: ObjectType.SHOP_PORTAL,
+                    position: [0, 0, -100],
+                    active: true,
+                });
 
-            if (isLetterDue) {
-                const lane = getRandomLane(laneCount);
-                const target = ['V', 'E', 'R', 'D', 'E'];
+                // Expand lanes
+                useStore.setState((state) => ({ laneCount: Math.min(state.laneCount + 2, 9) }));
 
-                // Filter out indices that are spaces or already collected
-                const availableIndices = target
-                    .map((char, i) => i)
-                    .filter(i => target[i] !== ' ' && !collectedLetters.includes(i));
+                distanceSinceLastShop.current = 0;
+                hasChanges = true;
+            } else {
+                // Calculate spawn gap for letters/obstacles
+                const minGap = 12 + (speed * 0.4);
+                const spawnZ = Math.min(furthestZ - minGap, -SPAWN_DISTANCE);
 
-                if (availableIndices.length > 0) {
-                    const chosenIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-                    const val = target[chosenIndex];
-                    const color = GEMINI_COLORS[chosenIndex];
+                if (gameMode === GameMode.MISSION && distanceTraveled.current >= nextLetterDistance.current) {
+                    const lane = getRandomLane(laneCount);
+                    const target = ['V', 'E', 'R', 'D', 'E'];
 
-                    keptObjects.push({
-                        id: uuidv4(),
-                        type: ObjectType.LETTER,
-                        position: [lane * LANE_WIDTH, 1.0, spawnZ],
-                        active: true,
-                        color: color,
-                        value: val,
-                        targetIndex: chosenIndex
-                    });
+                    // Filter out indices that are spaces or already collected
+                    const availableIndices = target
+                        .map((char, i) => i)
+                        .filter(i => target[i] !== ' ' && !collectedLetters.includes(i));
 
-                    // Schedule next letter based on current level difficulty
-                    nextLetterDistance.current += getLetterInterval(level);
-                    hasChanges = true;
-                } else {
-                    // Fallback to gem if all letters collected for this level
-                    keptObjects.push({
-                        id: uuidv4(),
-                        type: ObjectType.GEM,
-                        position: [lane * LANE_WIDTH, 1.2, spawnZ],
-                        active: true,
-                        color: '#00ffff',
-                        points: 50
-                    });
+                    if (availableIndices.length > 0) {
+                        const chosenIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+                        const val = target[chosenIndex];
+                        const color = GEMINI_COLORS[chosenIndex];
 
-                    // CRITICAL FIX: Increment distance even for fallback gems to prevent "infinite gem loop" blocking obstacles
-                    nextLetterDistance.current += getLetterInterval(level);
-                    hasChanges = true;
-                }
+                        keptObjects.push({
+                            id: uuidv4(),
+                            type: ObjectType.LETTER,
+                            position: [lane * LANE_WIDTH, 1.0, spawnZ],
+                            active: true,
+                            color: color,
+                            value: val,
+                            targetIndex: chosenIndex
+                        });
 
-            } else if (Math.random() > 0.1) { // 90% chance to attempt spawn if gap exists
-
-                // Increased obstacle probability from 0.35 to 0.20 (80% Obstacle/Alien, 20% Gem)
-                const isObstacle = Math.random() > 0.20;
-
-                if (isObstacle) {
-                    // Decide between Alien (Level 2+) or Spikes
-                    const spawnAlien = level >= 2 && Math.random() < 0.2; // 20% chance of obstacle being alien
-
-                    if (spawnAlien) {
-                        // Multi-Lane Alien Logic
-                        const availableLanes = [];
-                        const maxLane = Math.floor(laneCount / 2);
-                        for (let i = -maxLane; i <= maxLane; i++) availableLanes.push(i);
-                        availableLanes.sort(() => Math.random() - 0.5);
-
-                        // Determine how many aliens to spawn (1 to 3, based on probability)
-                        let alienCount = 1;
-                        const pAlien = Math.random();
-
-                        if (pAlien > 0.7) {
-                            // 30% chance for 2 aliens
-                            alienCount = Math.min(2, availableLanes.length);
-                        }
-                        // 10% chance for 3 aliens if there's enough space (and random allows)
-                        if (pAlien > 0.9 && availableLanes.length >= 3) {
-                            alienCount = 3;
-                        }
-
-                        for (let k = 0; k < alienCount; k++) {
-                            const lane = availableLanes[k];
-                            keptObjects.push({
-                                id: uuidv4(),
-                                type: ObjectType.ALIEN,
-                                position: [lane * LANE_WIDTH, 1.5, spawnZ],
-                                active: true,
-                                color: '#00ff00',
-                                hasFired: false
-                            });
-                        }
+                        // Schedule next letter based on current level difficulty
+                        nextLetterDistance.current += getLetterInterval(level);
+                        hasChanges = true;
                     } else {
-                        // Standard Obstacle Spawning
-                        const availableLanes = [];
-                        const maxLane = Math.floor(laneCount / 2);
-                        for (let i = -maxLane; i <= maxLane; i++) availableLanes.push(i);
-                        availableLanes.sort(() => Math.random() - 0.5);
+                        // Fallback to gem if all letters collected for this level
+                        keptObjects.push({
+                            id: uuidv4(),
+                            type: ObjectType.GEM,
+                            position: [lane * LANE_WIDTH, 1.2, spawnZ],
+                            active: true,
+                            color: '#00ffff',
+                            points: 50
+                        });
 
-                        let countToSpawn = 1;
-                        const p = Math.random();
-
-                        // Increased difficulty probabilities
-                        if (p > 0.80) {
-                            // Triple Spike (Was > 0.92)
-                            countToSpawn = Math.min(3, availableLanes.length);
-                        } else if (p > 0.50) {
-                            // Double Spike (Was > 0.75)
-                            countToSpawn = Math.min(2, availableLanes.length);
-                        } else {
-                            // Single Spike
-                            countToSpawn = 1;
-                        }
-
-                        for (let i = 0; i < countToSpawn; i++) {
-                            const lane = availableLanes[i];
-                            const laneX = lane * LANE_WIDTH;
-
-                            keptObjects.push({
-                                id: uuidv4(),
-                                type: ObjectType.OBSTACLE,
-                                position: [laneX, OBSTACLE_HEIGHT / 2, spawnZ],
-                                active: true,
-                                color: '#ff0054'
-                            });
-
-                            // Chance for gem on top of obstacle
-                            if (Math.random() < 0.3) {
-                                keptObjects.push({
-                                    id: uuidv4(),
-                                    type: ObjectType.GEM,
-                                    position: [laneX, OBSTACLE_HEIGHT + 1.0, spawnZ],
-                                    active: true,
-                                    color: '#ffd700',
-                                    points: 100
-                                });
-                            }
-                        }
+                        nextLetterDistance.current += getLetterInterval(level);
+                        hasChanges = true;
                     }
 
-                } else {
-                    // GROUND GEM SPAWNING
-                    const lane = getRandomLane(laneCount);
-                    keptObjects.push({
-                        id: uuidv4(),
-                        type: ObjectType.GEM,
-                        position: [lane * LANE_WIDTH, 1.2, spawnZ],
-                        active: true,
-                        color: '#00ffff',
-                        points: 50
-                    });
+                } else if (Math.random() > 0.1) { // 90% chance to attempt spawn if gap exists
+
+                    // Increased obstacle probability from 0.35 to 0.20 (80% Obstacle/Alien, 20% Gem)
+                    const isObstacle = Math.random() > 0.20;
+
+                    if (isObstacle) {
+                        // Decide between Alien or Spikes
+                        // Alien conditions: Mission mode (level >= 2) OR Endless mode (distance > 2500)
+                        const canSpawnAlien = (gameMode === GameMode.MISSION && level >= 2) || (gameMode === GameMode.ENDLESS && distanceTraveled.current > 2500);
+                        const spawnAlien = canSpawnAlien && Math.random() < 0.2; // 20% chance of obstacle being alien
+
+                        if (spawnAlien) {
+                            // Multi-Lane Alien Logic
+                            const availableLanes = [];
+                            const maxLane = Math.floor(laneCount / 2);
+                            for (let i = -maxLane; i <= maxLane; i++) availableLanes.push(i);
+                            availableLanes.sort(() => Math.random() - 0.5);
+
+                            // Determine how many aliens to spawn (1 to 3, based on probability)
+                            let alienCount = 1;
+                            const pAlien = Math.random();
+
+                            if (pAlien > 0.7) {
+                                // 30% chance for 2 aliens
+                                alienCount = Math.min(2, availableLanes.length);
+                            }
+                            // 10% chance for 3 aliens if there's enough space (and random allows)
+                            if (pAlien > 0.9 && availableLanes.length >= 3) {
+                                alienCount = 3;
+                            }
+
+                            for (let k = 0; k < alienCount; k++) {
+                                const lane = availableLanes[k];
+                                keptObjects.push({
+                                    id: uuidv4(),
+                                    type: ObjectType.ALIEN,
+                                    position: [lane * LANE_WIDTH, 1.5, spawnZ],
+                                    active: true,
+                                    color: '#00ff00',
+                                    hasFired: false
+                                });
+                            }
+                        } else {
+                            // Standard Obstacle Spawning
+                            const availableLanes = [];
+                            const maxLane = Math.floor(laneCount / 2);
+                            for (let i = -maxLane; i <= maxLane; i++) availableLanes.push(i);
+                            availableLanes.sort(() => Math.random() - 0.5);
+
+                            let countToSpawn = 1;
+                            const p = Math.random();
+
+                            // Increased difficulty probabilities
+                            if (p > 0.80) {
+                                // Triple Spike (Was > 0.92)
+                                countToSpawn = Math.min(3, availableLanes.length);
+                            } else if (p > 0.50) {
+                                // Double Spike (Was > 0.75)
+                                countToSpawn = Math.min(2, availableLanes.length);
+                            } else {
+                                // Single Spike
+                                countToSpawn = 1;
+                            }
+
+                            for (let i = 0; i < countToSpawn; i++) {
+                                const lane = availableLanes[i];
+                                const laneX = lane * LANE_WIDTH;
+
+                                keptObjects.push({
+                                    id: uuidv4(),
+                                    type: ObjectType.OBSTACLE,
+                                    position: [laneX, OBSTACLE_HEIGHT / 2, spawnZ],
+                                    active: true,
+                                    color: '#ff0054'
+                                });
+
+                                // Chance for gem on top of obstacle
+                                if (Math.random() < 0.3) {
+                                    keptObjects.push({
+                                        id: uuidv4(),
+                                        type: ObjectType.GEM,
+                                        position: [laneX, OBSTACLE_HEIGHT + 1.0, spawnZ],
+                                        active: true,
+                                        color: '#ffd700',
+                                        points: 100
+                                    });
+                                }
+                            }
+                        }
+
+                    } else {
+                        // GROUND GEM SPAWNING
+                        const lane = getRandomLane(laneCount);
+                        keptObjects.push({
+                            id: uuidv4(),
+                            type: ObjectType.GEM,
+                            position: [lane * LANE_WIDTH, 1.2, spawnZ],
+                            active: true,
+                            color: '#00ffff',
+                            points: 50
+                        });
+                    }
+                    hasChanges = true;
                 }
-                hasChanges = true;
             }
         }
 
@@ -614,7 +674,7 @@ export const LevelManager: React.FC = () => {
     );
 };
 
-const BuildingMesh: React.FC<{ scale: number[] }> = ({ scale }) => {
+const BuildingMesh: React.FC<{ scale: [number, number, number] }> = ({ scale }) => {
     const texture = useLoader(THREE.TextureLoader, './building_facade.png');
 
     // Clone texture to allow independent UV scaling per building instance if necessary,
@@ -636,6 +696,48 @@ const BuildingMesh: React.FC<{ scale: number[] }> = ({ scale }) => {
             {/* Use basic material for brightness or standard for lighting */}
             <meshStandardMaterial map={configuredTexture} color="#ffffff" roughness={0.3} metalness={0.1} />
         </mesh>
+    );
+};
+
+const SustainableHouseMesh: React.FC<{ scale: [number, number, number] }> = ({ scale }) => {
+    const wallColor = "#81C784"; // Soft green like a painted wall
+    const roofColor = "#A53E26"; // Terracotta roof tile color
+
+    // Scale for the house base
+    const baseScale: [number, number, number] = [scale[0], scale[1] * 0.7, scale[2]];
+
+    // Roof dimensions (slightly wider than base)
+    const roofScale: [number, number, number] = [scale[0] * 1.5, scale[1] * 0.5, scale[2] * 1.5];
+
+    return (
+        <group>
+            {/* Main House Box */}
+            <mesh geometry={HOUSE_GEO} scale={baseScale} position={[0, baseScale[1] / 2, 0]} castShadow receiveShadow>
+                <meshStandardMaterial color={wallColor} roughness={0.8} />
+            </mesh>
+
+            {/* Door (Simple grey/white rect) */}
+            <mesh position={[0, baseScale[1] * 0.4, baseScale[2] / 2 + 0.01]} scale={[scale[0] * 0.3, baseScale[1] * 0.6, 1]}>
+                <planeGeometry args={[1, 1]} />
+                <meshStandardMaterial color="#ffffff" />
+            </mesh>
+
+            {/* Window (Simple cyan rect) */}
+            <mesh position={[scale[0] * 0.25, baseScale[1] * 0.6, baseScale[2] / 2 + 0.01]} scale={[scale[0] * 0.2, scale[0] * 0.2, 1]}>
+                <planeGeometry args={[1, 1]} />
+                <meshStandardMaterial color="#88ccff" />
+            </mesh>
+
+            {/* Roof */}
+            <mesh geometry={ROOF_GEO} scale={roofScale} position={[0, baseScale[1] + (roofScale[1] / 2), 0]} castShadow>
+                <meshStandardMaterial color={roofColor} roughness={0.9} />
+            </mesh>
+
+            {/* Solar Panel on the roof slope */}
+            <mesh rotation={[-Math.PI / 3, 0, 0]} position={[0, baseScale[1] + (roofScale[1] * 0.2), roofScale[2] * 0.2]} geometry={SOLAR_PANEL_GEO} scale={[scale[0] * 0.6, scale[2] * 0.5, 1]}>
+                <meshStandardMaterial color="#1e3a8a" roughness={0.2} metalness={0.8} />
+            </mesh>
+        </group>
     );
 };
 
@@ -665,7 +767,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
                 // Alien Hover
                 visualRef.current.position.y = baseHeight + Math.sin(state.clock.elapsedTime * 3) * 0.2;
                 visualRef.current.rotation.y += delta;
-            } else if (data.type !== ObjectType.OBSTACLE && data.type !== ObjectType.BUILDING) {
+            } else if (data.type !== ObjectType.OBSTACLE && data.type !== ObjectType.BUILDING && data.type !== ObjectType.HOUSE) {
                 // Gem/Letter Bobbing
                 visualRef.current.rotation.y += delta * 3;
                 const bobOffset = Math.sin(state.clock.elapsedTime * 4 + data.position[0]) * 0.1;
@@ -688,7 +790,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
         if (data.type === ObjectType.SHOP_PORTAL) return null; // No shadow needed or custom handled
         if (data.type === ObjectType.ALIEN) return SHADOW_ALIEN_GEO;
         if (data.type === ObjectType.MISSILE) return SHADOW_MISSILE_GEO;
-        if (data.type === ObjectType.BUILDING) return null;
+        if (data.type === ObjectType.BUILDING || data.type === ObjectType.HOUSE) return null;
         return SHADOW_DEFAULT_GEO;
     }, [data.type]);
 
@@ -701,6 +803,13 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
             )}
 
             <group ref={visualRef} position={[0, data.position[1], 0]}>
+                {/* --- SUSTAINABLE HOUSE (Eco-City) --- */}
+                {data.type === ObjectType.HOUSE && data.scale && (
+                    <group>
+                        <SustainableHouseMesh scale={data.scale} />
+                    </group>
+                )}
+
                 {/* --- BUILDING (Eco-City) --- */}
                 {data.type === ObjectType.BUILDING && data.scale && (
                     <group>
@@ -727,7 +836,7 @@ const GameEntity: React.FC<{ data: GameObject }> = React.memo(({ data }) => {
                         </mesh>
                         <Center position={[0, 5, 0.6]}>
                             <Text3D font={FONT_URL} size={1.2} height={0.2}>
-                                LOJA SUSTENTÁVEL
+                                LOJA SUSTENTAVEL
                                 <meshBasicMaterial color="#ffff00" />
                             </Text3D>
                         </Center>

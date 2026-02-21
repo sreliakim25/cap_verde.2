@@ -5,9 +5,9 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Zap, Trophy, MapPin, Diamond, Rocket, ArrowUpCircle, Shield, Activity, PlusCircle, Play, Leaf, RefreshCw } from 'lucide-react';
+import { Heart, Zap, Trophy, MapPin, Diamond, Rocket, ArrowUpCircle, Shield, Activity, PlusCircle, Play, Leaf, RefreshCw, Info, X } from 'lucide-react';
 import { useStore } from '../../store';
-import { GameStatus, GEMINI_COLORS, ShopItem, RUN_SPEED_BASE } from '../../types';
+import { GameStatus, GEMINI_COLORS, ShopItem, GameMode, RUN_SPEED_BASE } from '../../types';
 import { audio } from '../System/Audio';
 import { Leaderboard } from './Leaderboard';
 import { Instructions } from './Instructions';
@@ -107,8 +107,43 @@ const ShopScreen: React.FC = () => {
     );
 };
 
+const GameDescription: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+    <div className="absolute inset-0 z-[150] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="bg-gray-900 border border-emerald-500/50 rounded-2xl max-w-2xl w-full p-6 md:p-8 relative shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+            <button
+                onClick={onClose}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+                <X className="w-8 h-8" />
+            </button>
+            <div className="text-center mb-6">
+                <h2 className="text-3xl md:text-4xl font-black font-cyber text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-600 tracking-wider mb-2">
+                    DESCRIÇÃO DO JOGO
+                </h2>
+                <div className="h-1 w-32 bg-emerald-500 mx-auto rounded-full"></div>
+            </div>
+            <div className="space-y-4 text-gray-200 text-center md:text-lg leading-relaxed font-sans">
+                <p>
+                    Este jogo é parte de um projeto da <strong className="text-emerald-400">Viana e Moura Construções</strong>, criado para incentivar e disseminar a cultura do desenvolvimento sustentável nas vilas e condomínios onde construímos e junto às comunidades que impactamos.
+                </p>
+                <p>
+                    Mais do que construir casas, construímos consciência, cuidado e futuro sustentável. Ao participar, você faz parte dessa transformação.
+                </p>
+            </div>
+            <div className="mt-8 text-center">
+                <button
+                    onClick={onClose}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 px-8 rounded-xl shadow-lg hover:shadow-emerald-500/50 transition-all transform hover:scale-105 flex items-center mx-auto tracking-wider"
+                >
+                    FECHAR
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 const GameOverScreen: React.FC = () => {
-    const { score, level, gemsCollected, distance, restartGame } = useStore();
+    const { score, level, gemsCollected, distance, restartGame, gameMode, setStatus } = useStore();
     const [message, setMessage] = useState('');
 
     useEffect(() => {
@@ -158,7 +193,7 @@ const GameOverScreen: React.FC = () => {
 
                 {/* Leaderboard Section */}
                 <div className="w-full max-w-md">
-                    <Leaderboard currentScore={score} allowSubmission={false} />
+                    <Leaderboard currentScore={gameMode === GameMode.ENDLESS ? distance : score} gameMode={gameMode} allowSubmission={gameMode === GameMode.ENDLESS} />
                 </div>
             </div>
         </div>
@@ -166,7 +201,7 @@ const GameOverScreen: React.FC = () => {
 };
 
 const VictoryScreen: React.FC = () => {
-    const { score, level, gemsCollected, distance, restartGame } = useStore();
+    const { score, level, gemsCollected, distance, gameMode, restartGame } = useStore();
 
     const quotes = [
         "A sustentabilidade é o caminho para o nosso futuro.",
@@ -229,7 +264,7 @@ const VictoryScreen: React.FC = () => {
 
                     {/* Leaderboard Column */}
                     <div className="flex flex-col items-center justify-start w-full">
-                        <Leaderboard currentScore={score} allowSubmission={true} />
+                        <Leaderboard currentScore={gameMode === GameMode.ENDLESS ? distance : score} gameMode={gameMode} allowSubmission={gameMode === GameMode.ENDLESS} />
                     </div>
                 </div>
             </div>
@@ -238,10 +273,20 @@ const VictoryScreen: React.FC = () => {
 };
 
 export const HUD: React.FC = () => {
-    const { score, lives, maxLives, collectedLetters, status, level, restartGame, startGame, gemsCollected, distance, isImmortalityActive, speed, setStatus } = useStore();
+    const { score, lives, maxLives, collectedLetters, status, level, restartGame, startGame, gemsCollected, distance, isImmortalityActive, speed, setStatus, gameMode } = useStore();
     const target = ['V', 'E', 'R', 'D', 'E'];
 
     const [showInstructions, setShowInstructions] = useState(false);
+    const [showDescription, setShowDescription] = useState(false);
+
+    // Handle Background Music based on Game Status
+    useEffect(() => {
+        if (status === GameStatus.MENU) {
+            audio.playBGM(0); // Track 1 for Menu (index 0)
+        } else if (status === GameStatus.PLAYING || status === GameStatus.SHOP || status === GameStatus.GAME_OVER || status === GameStatus.VICTORY) {
+            audio.playBGM(1); // Track 2 for all other gameplay states (index 1)
+        }
+    }, [status]);
 
     // Common container style
     const containerClass = "absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-8 z-50";
@@ -259,12 +304,13 @@ export const HUD: React.FC = () => {
                 {/* Card Container - Simplified and moved down */}
                 <div className="relative w-full max-w-sm bg-black/60 backdrop-blur-md rounded-2xl border border-green-500/30 p-6 shadow-[0_0_50px_rgba(0,255,100,0.3)] animate-in slide-in-from-bottom-10 duration-700 flex flex-col items-center mb-8">
 
+
                     <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mb-8 font-cyber text-center leading-tight drop-shadow-sm">
                         CAPITÃO VERDE<br /><span className="text-white text-2xl md:text-3xl tracking-[0.2em]">RUN</span>
                     </h1>
 
                     <button
-                        onClick={() => { audio.init(); startGame(); }}
+                        onClick={() => { audio.init(); startGame(GameMode.MISSION); }}
                         className="w-full group relative px-6 py-4 bg-green-600 hover:bg-green-500 text-white font-black text-xl rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.8)] hover:scale-105 active:scale-95 mb-4"
                     >
                         <span className="relative z-10 tracking-widest flex items-center justify-center">
@@ -273,11 +319,29 @@ export const HUD: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={() => { audio.init(); startGame(GameMode.ENDLESS); }}
+                        className="w-full group relative px-6 py-4 bg-teal-600 hover:bg-teal-500 text-white font-black text-xl rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_30px_rgba(20,184,166,0.8)] hover:scale-105 active:scale-95 mb-4"
+                    >
+                        <span className="relative z-10 tracking-widest flex items-center justify-center">
+                            INICIAR CORRIDA <Zap className="ml-2 w-5 h-5 fill-white" />
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowDescription(true)}
+                        className="w-full group relative px-6 py-3 bg-gray-800 hover:bg-gray-700 text-emerald-400 font-bold text-lg rounded-xl transition-all hover:scale-105 active:scale-95 border border-emerald-500/30 mb-4"
+                    >
+                        <span className="relative z-10 tracking-wider flex items-center justify-center">
+                            DESCRIÇÃO DO JOGO <Info className="ml-2 w-5 h-5" />
+                        </span>
+                    </button>
+
+                    <button
                         onClick={() => setShowInstructions(true)}
                         className="w-full group relative px-6 py-3 bg-gray-800 hover:bg-gray-700 text-green-400 font-bold text-lg rounded-xl transition-all hover:scale-105 active:scale-95 border border-green-500/30"
                     >
                         <span className="relative z-10 tracking-wider flex items-center justify-center">
-                            INSTRUÇÕES / MISSÃO <Shield className="ml-2 w-5 h-5" />
+                            INSTRUÇÕES / REGRAS <Shield className="ml-2 w-5 h-5" />
                         </span>
                     </button>
 
@@ -287,8 +351,9 @@ export const HUD: React.FC = () => {
 
                 </div>
 
-                {/* Instructions Modal */}
+                {/* Modals */}
                 {showInstructions && <Instructions onClose={() => setShowInstructions(false)} />}
+                {showDescription && <GameDescription onClose={() => setShowDescription(false)} />}
             </div>
         );
     }
@@ -321,10 +386,19 @@ export const HUD: React.FC = () => {
                 </div>
             </div>
 
-            {/* Level Indicator - Moved to Top Center aligned with Score/Hearts */}
-            <div className="absolute top-5 left-1/2 transform -translate-x-1/2 text-sm md:text-lg text-purple-300 font-bold tracking-wider font-mono bg-black/50 px-3 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm z-50">
-                LEVEL {level} <span className="text-gray-500 text-xs md:text-sm">/ 3</span>
-            </div>
+            {/* Level Indicator - Only in Mission Mode */}
+            {gameMode === GameMode.MISSION && (
+                <div className="absolute top-5 left-1/2 transform -translate-x-1/2 text-sm md:text-lg text-purple-300 font-bold tracking-wider font-mono bg-black/50 px-3 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm z-50">
+                    LEVEL {level} <span className="text-gray-500 text-xs md:text-sm">/ 3</span>
+                </div>
+            )}
+
+            {/* Distance Indicator - Only in Endless Mode */}
+            {gameMode === GameMode.ENDLESS && (
+                <div className="absolute top-5 left-1/2 transform -translate-x-1/2 text-lg md:text-2xl text-purple-300 font-bold tracking-wider font-mono bg-black/50 px-4 py-1 rounded-full border border-purple-500/30 backdrop-blur-sm z-50 shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                    {Math.floor(distance)} M
+                </div>
+            )}
 
             {/* Active Skill Indicator */}
             {isImmortalityActive && (
@@ -333,31 +407,33 @@ export const HUD: React.FC = () => {
                 </div>
             )}
 
-            {/* Capitão Verde Collection Status - Just below Top Bar */}
-            <div className="absolute top-16 md:top-24 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-1.5">
-                {target.map((char, idx) => {
-                    const isCollected = collectedLetters.includes(idx);
-                    const isSpace = char === ' ';
-                    const color = GEMINI_COLORS[idx % GEMINI_COLORS.length];
+            {/* Capitão Verde Collection Status - Only in Mission Mode */}
+            {gameMode === GameMode.MISSION && (
+                <div className="absolute top-16 md:top-24 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-1.5">
+                    {target.map((char, idx) => {
+                        const isCollected = collectedLetters.includes(idx);
+                        const isSpace = char === ' ';
+                        const color = GEMINI_COLORS[idx % GEMINI_COLORS.length];
 
-                    if (isSpace) return <div key={idx} className="w-2 md:w-3" />;
+                        if (isSpace) return <div key={idx} className="w-2 md:w-3" />;
 
-                    return (
-                        <div
-                            key={idx}
-                            style={{
-                                borderColor: isCollected ? color : 'rgba(55, 65, 81, 0.5)',
-                                color: isCollected ? 'rgba(0, 0, 0, 0.9)' : 'rgba(55, 65, 81, 0.5)',
-                                boxShadow: isCollected ? `0 0 15px ${color}` : 'none',
-                                backgroundColor: isCollected ? color : 'rgba(0, 0, 0, 0.4)'
-                            }}
-                            className={`w-6 h-8 md:w-8 md:h-10 flex items-center justify-center border-2 font-black text-sm md:text-base font-cyber rounded-md transform transition-all duration-300`}
-                        >
-                            {char}
-                        </div>
-                    );
-                })}
-            </div>
+                        return (
+                            <div
+                                key={idx}
+                                style={{
+                                    borderColor: isCollected ? color : 'rgba(55, 65, 81, 0.5)',
+                                    color: isCollected ? 'rgba(0, 0, 0, 0.9)' : 'rgba(55, 65, 81, 0.5)',
+                                    boxShadow: isCollected ? `0 0 15px ${color}` : 'none',
+                                    backgroundColor: isCollected ? color : 'rgba(0, 0, 0, 0.4)'
+                                }}
+                                className={`w-6 h-8 md:w-8 md:h-10 flex items-center justify-center border-2 font-black text-sm md:text-base font-cyber rounded-md transform transition-all duration-300`}
+                            >
+                                {char}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Bottom Overlay */}
             <div className="w-full flex justify-end items-end">

@@ -4,11 +4,12 @@ import { Trophy, User, Send, Loader2, AlertCircle } from 'lucide-react';
 
 interface LeaderboardProps {
     currentScore?: number;
+    gameMode?: string;
     onClose?: () => void;
     allowSubmission?: boolean;
 }
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose, allowSubmission = true }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, gameMode, onClose, allowSubmission = true }) => {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [playerName, setPlayerName] = useState('');
@@ -51,10 +52,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose,
             </div>
 
             {/* Score Submission Form - Only if score provided, allowed, and not submitted yet */}
-            {allowSubmission && currentScore !== undefined && currentScore > 0 && !submitted && (
+            {allowSubmission && currentScore !== undefined && currentScore > 0 && !submitted && gameMode === 'ENDLESS' && (
                 <div className="mb-8 p-4 bg-green-900/20 rounded-lg border border-green-500/20">
                     <h3 className="text-white font-bold mb-2 flex items-center">
-                        <span className="text-cyan-400 mr-2">{currentScore.toLocaleString()}</span> PONTOS
+                        <span className="text-cyan-400 mr-2">{Math.floor(currentScore).toLocaleString()}</span> METROS
                     </h3>
                     <form onSubmit={handleSubmit} className="flex flex-col space-y-3">
                         <div className="relative">
@@ -111,7 +112,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentScore, onClose,
                                 </span>
                                 <span className="font-bold text-white tracking-wide">{entry.name}</span>
                             </div>
-                            <span className="font-mono text-cyan-400">{entry.score.toLocaleString()}</span>
+                            <span className="font-mono text-cyan-400">{Math.floor(entry.score).toLocaleString()} M</span>
                         </div>
                     ))
                 )}

@@ -5,10 +5,11 @@
 
 
 import { create } from 'zustand';
-import { GameStatus, RUN_SPEED_BASE } from './types';
+import { GameStatus, GameMode, RUN_SPEED_BASE } from './types';
 
 interface GameState {
   status: GameStatus;
+  gameMode: GameMode;
   score: number;
   lives: number;
   maxLives: number;
@@ -25,7 +26,7 @@ interface GameState {
   isImmortalityActive: boolean;
 
   // Actions
-  startGame: () => void;
+  startGame: (mode: GameMode) => void;
   restartGame: () => void;
   takeDamage: () => void;
   addScore: (amount: number) => void;
@@ -47,6 +48,7 @@ const MAX_LEVEL = 3;
 
 export const useStore = create<GameState>((set, get) => ({
   status: GameStatus.MENU,
+  gameMode: GameMode.MISSION,
   score: 0,
   lives: 3,
   maxLives: 3,
@@ -61,8 +63,9 @@ export const useStore = create<GameState>((set, get) => ({
   hasImmortality: false,
   isImmortalityActive: false,
 
-  startGame: () => set({
+  startGame: (mode: GameMode) => set({
     status: GameStatus.PLAYING,
+    gameMode: mode,
     score: 0,
     lives: 3,
     maxLives: 3,
@@ -77,7 +80,7 @@ export const useStore = create<GameState>((set, get) => ({
     isImmortalityActive: false
   }),
 
-  restartGame: () => set({
+  restartGame: () => set((state) => ({
     status: GameStatus.PLAYING,
     score: 0,
     lives: 3,
@@ -91,7 +94,7 @@ export const useStore = create<GameState>((set, get) => ({
     hasDoubleJump: false,
     hasImmortality: false,
     isImmortalityActive: false
-  }),
+  })),
 
   takeDamage: () => {
     const { lives, isImmortalityActive } = get();
