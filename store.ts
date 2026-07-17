@@ -210,5 +210,4 @@ export const useStore = create<GameState>((set, get) => ({
   },
 
   setStatus: (status) => set({ status }),
-  increaseLevel: () => set((state) => ({ level: state.level + 1 })),
 }));

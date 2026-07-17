@@ -57,6 +57,9 @@ ROOF_GEO.rotateY(Math.PI / 4);
 const PARTICLE_COUNT = 600;
 const BASE_LETTER_INTERVAL = 150;
 
+// Vetor reutilizável para evitar alocação por frame (GC pressure)
+const _playerPos = new THREE.Vector3();
+
 const getLetterInterval = (level: number) => {
     // Level 1: 150
     // Level 2: 225 (150 * 1.5)
@@ -278,7 +281,7 @@ export const LevelManager: React.FC = () => {
         }
 
         let hasChanges = false;
-        let playerPos = new THREE.Vector3(0, 0, 0);
+        const playerPos = _playerPos.set(0, 0, 0);
 
         if (playerObjRef.current) {
             playerObjRef.current.getWorldPosition(playerPos);
@@ -427,13 +430,18 @@ export const LevelManager: React.FC = () => {
         }
 
         // 2. Spawning Logic
+        // Loop único para achar o Z mais distante (evita filter+map+spread por frame)
+        // Considera só obstáculos/gems para o cálculo de gap, não mísseis, prédios ou casas
         let furthestZ = 0;
-        // Only consider static obstacles/gems for gap calculation, not missiles, buildings, or houses
-        const staticObjects = keptObjects.filter(o => o.type !== ObjectType.MISSILE && o.type !== ObjectType.BUILDING && o.type !== ObjectType.HOUSE);
-
-        if (staticObjects.length > 0) {
-            furthestZ = Math.min(...staticObjects.map(o => o.position[2]));
-        } else {
+        let hasStatic = false;
+        for (const o of keptObjects) {
+            if (o.type === ObjectType.MISSILE || o.type === ObjectType.BUILDING || o.type === ObjectType.HOUSE) continue;
+            if (!hasStatic || o.position[2] < furthestZ) {
+                furthestZ = o.position[2];
+                hasStatic = true;
+            }
+        }
+        if (!hasStatic) {
             furthestZ = -20;
         }
 

@@ -36,13 +36,24 @@ export const leaderboardService = {
     submitScore: async (name: string, score: number): Promise<boolean> => {
         if (!supabase) return false;
 
-        // Basic validation
-        if (!name || name.trim().length === 0) return false;
+        // Sanitização do nome: só letras/números, máx. 10 caracteres, maiúsculas
+        const cleanName = (name || '')
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9 ]/g, '')
+            .slice(0, 10)
+            .trim();
+
+        if (cleanName.length === 0) return false;
+
+        // Validação do score: inteiro, não-negativo e dentro de um teto plausível
+        const cleanScore = Math.floor(score);
+        if (!Number.isFinite(cleanScore) || cleanScore < 0 || cleanScore > 1000000) return false;
 
         const { error } = await supabase
             .from(TABLE_NAME)
             .insert([
-                { name: name.trim().toUpperCase(), score: score }
+                { name: cleanName, score: cleanScore }
             ]);
 
         if (error) {
